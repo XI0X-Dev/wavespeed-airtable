@@ -119,18 +119,32 @@ function authHeader() {
 const memoryRequestMap = new Map();
 
 async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, height }, parentRecordId) {
-  // WICHTIG für edit-sequential: REFS zuerst, SUBJECT zuletzt
-  const images = [...(refDataUrls || []), subjectDataUrl].filter(Boolean);
+  // Duplicate first reference to give it more weight (like the extension does)
+  let images;
+  if (refDataUrls && refDataUrls.length > 0) {
+    images = [refDataUrls[0], refDataUrls[0], ...refDataUrls.slice(1), subjectDataUrl].filter(Boolean);
+  } else {
+    images = [subjectDataUrl];
+  }
 
   const payload = {
-    size: `${width}*${height}`,
+    size: '2572*3576',  // Changed to match extension
     max_images: 1,
     enable_base64_output: false,
     enable_sync_mode: false,
-    prompt: String(prompt || ""),
+    prompt: "refer to this image",  // Changed to match extension
     negative_prompt: "text, caption, watermark, logo, emoji, subtitles, overlay, banner, stickers, handwriting",
     images
   };
+
+  const url = new URL(`${WAVESPEED_BASE}${WAVESPEED_SUBMIT_PATH}`);
+  url.searchParams.set("webhook", `${PUBLIC_BASE_URL}/webhooks/wavespeed`);
+
+  const res = await fetch(url.toString(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeader() },
+    body: JSON.stringify(payload)
+  });
 
   const url = new URL(`${WAVESPEED_BASE}${WAVESPEED_SUBMIT_PATH}`);
   url.searchParams.set("webhook", `${PUBLIC_BASE_URL}/webhooks/wavespeed`);
