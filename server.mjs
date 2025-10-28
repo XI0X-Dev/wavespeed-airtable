@@ -132,7 +132,7 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
     max_images: 1,
     enable_base64_output: false,
     enable_sync_mode: false,
-    prompt: "refer to this image",  // Changed to match extension
+    prompt: "refer to this image: replicate exactly the face and color and style hair from img1 and the pose, outfit and background from img2. amateur photo, natural lighting, visible skin texture, medium distance, small waist.",  // Changed to match extension
     negative_prompt: "text, caption, watermark, logo, emoji, subtitles, overlay, banner, stickers, handwriting",
     images
   };
