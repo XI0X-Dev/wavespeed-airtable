@@ -132,9 +132,9 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
     max_images: 1,
     enable_base64_output: false,
     enable_sync_mode: false,
-    prompt: "refer to this image",
-    negative_prompt: "text, caption, watermark, logo, emoji, subtitles, overlay, banner, stickers, handwriting",
-    images
+    prompt: "refer to this image: replicate exactly the face and color and style hair from img1 and the pose, outfit and background from img2. amateur photo, natural lighting, visible skin texture, medium distance, small waist.",
+    negative_prompt: "text, caption, watermark, logo, emoji, subtitles, overlay, banner, stickers, piercings, tattoos, handwriting",
+  
   };
 
   const url = new URL(`${WAVESPEED_BASE}${WAVESPEED_SUBMIT_PATH}`);
