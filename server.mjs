@@ -267,40 +267,45 @@ async function startRunFromRecord(recordId, opts = {}) {
   const rec = await atGet(recordId);
   const f = rec.fields || {};
 
-  const prompt = String(f["Prompt"] || "");
-  const subject_url = f["Subject"]?.[0]?.url || f["Subject URL"] || "";
-  const references = Array.isArray(f["References"]) ? f["References"].map(x => x.url) : [];
+  // SWAPPED: Subject is now the FACE (reference), References are the BODY/POSE images
+  const faceUrl = f["Subject"]?.[0]?.url || f["Subject URL"] || "";
+  const poseImages = Array.isArray(f["References"]) ? f["References"].map(x => x.url) : [];
   const refCsv = splitCSV(f["Reference URLs"] || "");
-  const reference_urls = [...references, ...refCsv].filter(Boolean);
+  const allPoseUrls = [...poseImages, ...refCsv].filter(Boolean);
 
-  if (!prompt || !subject_url) throw new Error("Record needs Prompt + Subject");
+  if (!faceUrl || allPoseUrls.length === 0) throw new Error("Record needs Subject (face) + References (pose/body images)");
 
-  // Größe
-  let W = 1024, H = 1344;
+  // Size - hardcoded to match extension
+  let W = 2572, H = 3576;
   const sizeStr = String(f["Size"] || "");
   const m = sizeStr.match(/(\d+)\s*[xX*]\s*(\d+)/);
   if (m) { W = +m[1]; H = +m[2]; }
-  ({ w: W, h: H } = ensureMinPixels(W, H));
 
-  // Data-URLs
-  const subjectDataUrl = await urlToDataURL(subject_url);
-  const refDataUrls = [];
-  for (const r of reference_urls) {
-    try { refDataUrls.push(await urlToDataURL(r)); } catch (e) { console.warn("[REF WARN]", r, e.message); }
+  // Convert images to data URLs
+  // Face becomes reference (send twice for more weight)
+  const faceDataUrl = await urlToDataURL(faceUrl);
+  const refDataUrls = [faceDataUrl]; // Face as reference
+
+  // First pose image becomes subject
+  const subjectDataUrl = await urlToDataURL(allPoseUrls[0]);
+
+  // Additional pose images as extra references (if any)
+  for (let i = 1; i < allPoseUrls.length; i++) {
+    try { refDataUrls.push(await urlToDataURL(allPoseUrls[i])); } catch (e) { console.warn("[REF WARN]", allPoseUrls[i], e.message); }
   }
 
   // Status reset
   await atPatch(recordId, { Status: "processing", "Request IDs": "", "Seen IDs": "", "Failed IDs": "", "Last Update": nowISO(), Model: MODEL_NAME, Size: `${W}x${H}` });
 
-  // Batch-Count (optional Feld)
-  const N = Math.max(1, Math.min(24, Number(f["Batch Count"] || opts.batch || 4)));
+  // Batch-Count
+  const N = Math.max(1, Math.min(24, Number(f["Batch Count"] || opts.batch || 3)));
 
   const requestIds = [];
   for (let i = 0; i < N; i++) {
     let rid = null, lastErr = null;
     for (let a = 0; a < SUBMIT_MAX_RETRIES && !rid; a++) {
       try {
-        rid = await submitGeneration({ prompt, subjectDataUrl, refDataUrls, width: W, height: H }, recordId);
+        rid = await submitGeneration({ prompt: "", subjectDataUrl, refDataUrls, width: W, height: H }, recordId);
       } catch (err) {
         lastErr = err; await sleep(backoff(a, SUBMIT_BASE_DELAY_MS));
       }
@@ -309,6 +314,7 @@ async function startRunFromRecord(recordId, opts = {}) {
     requestIds.push(rid);
     if (i < N - 1) await sleep(JOB_SPACING_MS);
   }
+
   await atPatch(recordId, { "Request IDs": requestIds.join(", "), "Last Update": nowISO() });
 
   // Poll
