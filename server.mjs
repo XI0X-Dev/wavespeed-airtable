@@ -128,23 +128,14 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
   }
 
   const payload = {
-    size: '2572*3576',  // Changed to match extension
+    size: '2572*3576',
     max_images: 1,
     enable_base64_output: false,
     enable_sync_mode: false,
-    prompt: "refer to this image: replicate exactly the face and color and style hair from img1 and the pose, outfit and background from img2. amateur photo, natural lighting, visible skin texture, medium distance, small waist.",  // Changed to match extension
+    prompt: "refer to this image",
     negative_prompt: "text, caption, watermark, logo, emoji, subtitles, overlay, banner, stickers, handwriting",
     images
   };
-
-  const url = new URL(`${WAVESPEED_BASE}${WAVESPEED_SUBMIT_PATH}`);
-  url.searchParams.set("webhook", `${PUBLIC_BASE_URL}/webhooks/wavespeed`);
-
-  const res = await fetch(url.toString(), {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeader() },
-    body: JSON.stringify(payload)
-  });
 
   const url = new URL(`${WAVESPEED_BASE}${WAVESPEED_SUBMIT_PATH}`);
   url.searchParams.set("webhook", `${PUBLIC_BASE_URL}/webhooks/wavespeed`);
