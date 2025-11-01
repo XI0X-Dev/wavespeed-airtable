@@ -133,25 +133,10 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
   enable_base64_output: false,
   enable_sync_mode: false,
   seed: 42,  // Fixed seed for consistency
-  prompt: 'refer to this image: replicate exactly the face and color and style hair from img1 and the pose, outfit and background from img2. amateur photo, natural lighting, visible skin texture, medium distance, small waist.',
-  negative_prompt: 'text, caption, watermark, logo, emoji, subtitles, overlay, banner, stickers, piercings, tattoos, handwriting, variations, different backgrounds, different lighting',
+  prompt: 'refer to this image: replicate exactly the face and color and style hair from img1 and the pose, outfit and exact copy of the background from img2. amateur photo, natural lighting, visible skin texture, medium distance, small waist.',
+  negative_prompt: 'text, variations, different background, different lightning, , inconsistent, caption, watermark, logo, emoji, subtitles, overlay, banner, stickers, piercings, tattoos, handwriting, variations, different backgrounds, different lighting',
   images: images
 };
-```
-
-**2. Update the negative prompt to prevent variations:**
-
-Add these keywords to the negative prompt:
-- `variations`
-- `different backgrounds`
-- `different lighting`
-- `inconsistent`
-
-**3. Strengthen the prompt:**
-
-Change the prompt to:
-```
-refer to this image: EXACT copy of face from img1, EXACT copy of background, lighting, and environment from img2, maintain perfect consistency, no variations, amateur photo, natural lighting, visible skin texture, medium distance, small waist.
 
   const url = new URL(`${WAVESPEED_BASE}${WAVESPEED_SUBMIT_PATH}`);
   url.searchParams.set("webhook", `${PUBLIC_BASE_URL}/webhooks/wavespeed`);
