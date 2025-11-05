@@ -128,13 +128,13 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
   }
 
   const payload = {
-  size: '2572*3576',
+  size: '3072*4096',
   max_images: 1,
   enable_base64_output: false,
   enable_sync_mode: false,
   seed: 42,  // Fixed seed for consistency
-  prompt: 'refer to this image: replicate exactly the face and color and style hair from img1 and the pose, outfit and exact copy of the background from img2. amateur photo, natural lighting, visible skin texture, medium distance, small waist.',
-  negative_prompt: 'text, variations, different background, different lightning, , inconsistent, caption, watermark, logo, emoji, subtitles, overlay, banner, stickers, piercings, tattoos, handwriting, variations, different backgrounds, different lighting',
+  prompt: 'refer to this image: copy ONLY the face identity, skin tone, and hair color from img1, but take the EXACT facial expression, emotion, head tilt, pose, and body position from img2, replicate the exact background and lighting from img2, amateur photo, natural lighting, visible skin texture, medium distance, small waist.',
+  negative_prompt: 'text, variations, different background, different lightning, inconsistent, caption, watermark, logo, emoji, subtitles, overlay, banner, stickers, piercings, tattoos, handwriting, neutral expression, different facial expression, closed eyes when source has open eyes, different head position.',
   images: images
 };
 
