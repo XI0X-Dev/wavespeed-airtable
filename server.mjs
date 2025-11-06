@@ -120,8 +120,8 @@ const memoryRequestMap = new Map();
 
 async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, height }, parentRecordId) {
   // Image order for face swapping:
-  // - Face reference appears 3 times for maximum weight
-  // - Then target pose/body image
+  // - First reference (face) appears 3 times for maximum weight
+  // - Then target pose image as subject
   // - Then any additional reference images
   let images;
   if (refDataUrls && refDataUrls.length > 0) {
@@ -144,7 +144,7 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
     enable_sync_mode: false,
     seed: 42,
     prompt: 'Perfect face and hair transfer: copy the complete facial identity AND hair (hair color, hair style, hair texture) from img1 onto the person in img2. Preserve exact pose, body position, clothing, accessories, background, lighting from img2. Natural skin texture with visible pores, realistic lighting, unretouched look, authentic photography. Match the exact body angle and position from img2 including back views, side angles, and all body parts visible in the reference.',
-    negative_prompt: 'wrong face, different facial features, wrong hair color, blonde hair when source has dark hair, different hair color than source, plastic skin, overly smooth skin, airbrushed look, fake texture, artificial smoothing, wrong person, face variations, missing body parts, incomplete pose, different angle than reference, cropped limbs, simplified pose, added bangs when source has no bangs, removed bangs when source has bangs, added freckles, removed freckles, different freckle pattern.',
+    negative_prompt: 'wrong face, different facial features, wrong hair color, blonde hair when source has dark hair, different hair color than source, plastic skin, overly smooth skin, airbrushed look, fake texture, artificial smoothing, wrong person, face variations, missing body parts, incomplete pose, different angle than reference, cropped limbs, simplified pose.',
     images: images
   };
 
