@@ -120,7 +120,7 @@ const memoryRequestMap = new Map();
 
 async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, height }, parentRecordId) {
   // Image order for face swapping:
-  // - First reference (face) appears 3 times for maximum weight
+  // - Face reference appears 3 times for maximum weight
   // - Then target pose image as subject
   // - Then any additional reference images
   let images;
