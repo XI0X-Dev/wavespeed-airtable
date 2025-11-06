@@ -138,13 +138,13 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
   }
 
   const payload = {
-    size: `${width}*${height}`,
+    size: '3072*4096',
     max_images: 1,
     enable_base64_output: false,
     enable_sync_mode: false,
     seed: 42,
-    prompt: 'Seamless face replacement: transfer the facial identity AND hair (exact hair color, hair style, hair texture) from img1 onto the person in img2. The face must look like it naturally belongs to the body - match head size proportionally to body from img2, blend seamlessly at neck and jawline, match skin tone and lighting. Preserve exact pose, body position, body proportions, clothing, accessories, background, lighting from img2. Natural unretouched photography, realistic skin texture with pores, authentic integration.',
-    negative_prompt: 'wrong face, different facial features, wrong hair color, blonde hair when source has dark hair, different hair color than source, oversized head, undersized head, disproportionate head to body ratio, unnaturally large head, unnaturally small head, head too big for body, head too small for body, visible seams at neck, harsh transitions, pasted appearance, obvious face swap, plastic skin, overly smooth skin, airbrushed look, fake texture, artificial smoothing, wrong person, face variations, missing body parts, incomplete pose, different angle than reference, cropped limbs, simplified pose, added bangs when source has no bangs, removed bangs when source has bangs.',
+    prompt: 'Perfect face swap: transfer the complete facial identity from img1 (face shape, eyes, nose, lips, skin tone, facial structure, expression) onto the person in img2. Preserve everything from img2: exact body pose, clothing, accessories, background, lighting, and composition. Seamlessly blend img1 face into img2 scene. Photorealistic, natural lighting, high detail, consistent quality, perfect face match.',
+    negative_prompt: 'wrong face, different facial features, inconsistent face identity, mismatched skin tone, blurry face, distorted features, low quality, different pose from reference, different background, different clothes on face source, artificial look, unrealistic, multiple faces, face variations, wrong person, bad face swap.',
     images: images
   };
 
