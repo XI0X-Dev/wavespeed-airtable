@@ -119,24 +119,34 @@ function authHeader() {
 const memoryRequestMap = new Map();
 
 async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, height }, parentRecordId) {
-  // Duplicate first reference to give it more weight (like the extension does)
+  // Image order for face swapping:
+  // - First reference (face) appears 3 times for maximum weight
+  // - Then target pose image as subject
+  // - Then any additional reference images
   let images;
   if (refDataUrls && refDataUrls.length > 0) {
-    images = [refDataUrls[0], refDataUrls[0], ...refDataUrls.slice(1), subjectDataUrl].filter(Boolean);
+    // Give face reference maximum weight by including it 3 times
+    images = [
+      refDataUrls[0],  // Face reference #1
+      refDataUrls[0],  // Face reference #2
+      refDataUrls[0],  // Face reference #3
+      subjectDataUrl,  // Target pose/body image
+      ...refDataUrls.slice(1)  // Any additional references
+    ].filter(Boolean);
   } else {
     images = [subjectDataUrl];
   }
 
   const payload = {
-  size: '3072*4096',
-  max_images: 1,
-  enable_base64_output: false,
-  enable_sync_mode: false,
-  seed: 42,  // Fixed seed for consistency
-  prompt: 'refer to this image: copy ONLY the face identity, skin tone, and hair color from img1, but take the EXACT facial expression, emotion, head tilt, pose, and body position from img2, replicate the exact background and lighting from img2, amateur photo, natural lighting, visible skin texture, medium distance, small waist.',
-  negative_prompt: 'text, variations, different background, different lightning, inconsistent, caption, watermark, logo, emoji, subtitles, overlay, banner, stickers, piercings, tattoos, handwriting, neutral expression, different facial expression, closed eyes when source has open eyes, different head position.',
-  images: images
-};
+    size: '3072*4096',
+    max_images: 1,
+    enable_base64_output: false,
+    enable_sync_mode: false,
+    seed: 42,
+    prompt: 'Perfect face swap: transfer the complete facial identity from img1 (face shape, eyes, nose, lips, skin tone, facial structure, expression) onto the person in img2. Preserve everything from img2: exact body pose, clothing, accessories, background, lighting, and composition. Seamlessly blend img1 face into img2 scene. Photorealistic, natural lighting, high detail, consistent quality, perfect face match.',
+    negative_prompt: 'wrong face, different facial features, inconsistent face identity, mismatched skin tone, blurry face, distorted features, low quality, different pose from reference, different background, different clothes on face source, artificial look, unrealistic, multiple faces, face variations, wrong person, bad face swap.',
+    images: images
+  };
 
   const url = new URL(`${WAVESPEED_BASE}${WAVESPEED_SUBMIT_PATH}`);
   url.searchParams.set("webhook", `${PUBLIC_BASE_URL}/webhooks/wavespeed`);
@@ -238,14 +248,14 @@ app.get("/app", (_, res) => {
   res.end(`<!doctype html>
 <html><head><meta charset="utf-8"/><title>Batch Runner</title></head>
 <body style="font-family:system-ui;padding:24px;max-width:760px;margin:auto">
-<h1>Seedream v4 — edit-sequential</h1>
+<h1>Seedream v4 — Face Swap</h1>
 <form method="POST" action="/generate-batch">
-<label>Prompt</label><br/>
-<textarea name="prompt" rows="3" required></textarea><br/><br/>
-<label>Subject URL</label><br/>
+<label>Prompt (optional - will use optimized default)</label><br/>
+<textarea name="prompt" rows="3"></textarea><br/><br/>
+<label>Face Image URL (source face)</label><br/>
 <input name="subject_url" type="url" required/><br/><br/>
-<label>Reference URLs (comma-separated)</label><br/>
-<input name="reference_urls" type="text"/><br/><br/>
+<label>Target Pose Image URL (body/pose/scene to recreate)</label><br/>
+<input name="reference_urls" type="text" required/><br/><br/>
 <label>Width</label><input name="width" type="number" value="1024" required/>
 <label style="margin-left:12px">Height</label><input name="height" type="number" value="1344" required/>
 <label style="margin-left:12px">Batch</label><input name="batch_count" type="number" value="4" min="1" max="24" required/><br/><br/>
@@ -259,7 +269,8 @@ async function startRunFromRecord(recordId, opts = {}) {
   const rec = await atGet(recordId);
   const f = rec.fields || {};
 
-  // SWAPPED: Subject is now the FACE (reference), References are the BODY/POSE images
+  // Subject = FACE image (what we want to transfer)
+  // References = BODY/POSE images (target scenes)
   const faceUrl = f["Subject"]?.[0]?.url || f["Subject URL"] || "";
   const poseImages = Array.isArray(f["References"]) ? f["References"].map(x => x.url) : [];
   const refCsv = splitCSV(f["Reference URLs"] || "");
@@ -274,9 +285,8 @@ async function startRunFromRecord(recordId, opts = {}) {
   if (m) { W = +m[1]; H = +m[2]; }
 
   // Convert images to data URLs
-  // Face becomes reference (send twice for more weight)
   const faceDataUrl = await urlToDataURL(faceUrl);
-  const refDataUrls = [faceDataUrl]; // Face as reference
+  const refDataUrls = [faceDataUrl]; // Face as reference (will be duplicated for weight)
 
   // First pose image becomes subject
   const subjectDataUrl = await urlToDataURL(allPoseUrls[0]);
@@ -349,7 +359,7 @@ app.get("/airtable/run/:recordId", async (req, res) => {
 app.post("/generate-batch", async (req, res) => {
   try {
     const { prompt, subject_url, reference_urls, width, height, batch_count } = req.body;
-    if (!prompt || !subject_url || !width || !height || !batch_count) return res.status(400).json({ error: "Missing fields." });
+    if (!subject_url || !reference_urls || !width || !height || !batch_count) return res.status(400).json({ error: "Missing fields." });
 
     const refs = splitCSV(reference_urls);
     let { w: W, h: H } = ensureMinPixels(Number(width), Number(height));
@@ -360,7 +370,7 @@ app.post("/generate-batch", async (req, res) => {
 
     const runId = uuid();
     const parentId = await atCreate({
-      Prompt: String(prompt),
+      Prompt: String(prompt || ""),
       Subject: [{ url: subject_url }],
       References: refs.map((u, i) => ({ url: u, filename: `ref_${i + 1}` })),
       Output: [],
@@ -382,7 +392,7 @@ app.post("/generate-batch", async (req, res) => {
       let rid = null, lastErr = null;
       for (let a = 0; a < SUBMIT_MAX_RETRIES && !rid; a++) {
         try {
-          rid = await submitGeneration({ prompt, subjectDataUrl, refDataUrls, width: W, height: H }, parentId);
+          rid = await submitGeneration({ prompt: prompt || "", subjectDataUrl, refDataUrls, width: W, height: H }, parentId);
         } catch (err) {
           lastErr = err; await sleep(backoff(a, SUBMIT_BASE_DELAY_MS));
         }
