@@ -138,13 +138,13 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
   }
 
   const payload = {
-    size: '3072*4096',
+    size: `${width}*${height}`,
     max_images: 1,
     enable_base64_output: false,
     enable_sync_mode: false,
     seed: 42,
-    prompt: 'Perfect face swap: Transfer ONLY the facial identity and hair (face shape, eyes, nose, lips, skin tone, facial structure, hair color) from img1 onto img2. Recreate img2 EXACTLY: identical camera angle, identical body position, identical pose, identical facial expression, identical body proportions, identical background, identical lighting, identical composition. Match the exact head-to-body ratio from img2. Copy the exact emotion and expression from img2 face. Natural skin texture with pores and freckles, realistic photography, unedited look.',
-    negative_prompt: 'wrong face, different facial features, wrong hair color, different hair than source, plastic skin, overly smooth skin, airbrushed, oversized head, undersized head, wrong proportions, disproportionate head, cartoon proportions, different pose, different angle, different expression, neutral expression when reference shows emotion, different camera angle, different background, simplified pose, missing body parts, cropped, tattoos, body ink, skin markings, piercings visible on body.',
+    prompt: 'Perfect face and hair transfer: copy the complete facial identity AND hair (hair color, hair style, hair texture) from img1 onto the person in img2. Preserve exact pose, body position, clothing, accessories, background, lighting from img2. Natural skin texture with visible pores, realistic lighting, unretouched look, authentic photography. Match the exact body angle and position from img2 including back views, side angles, and all body parts visible in the reference.',
+    negative_prompt: 'wrong face, different facial features, wrong hair color, blonde hair when source has dark hair, different hair color than source, plastic skin, overly smooth skin, airbrushed look, fake texture, artificial smoothing, wrong person, face variations, missing body parts, incomplete pose, different angle than reference, cropped limbs, simplified pose.',
     images: images
   };
 
