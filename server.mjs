@@ -119,18 +119,17 @@ function authHeader() {
 const memoryRequestMap = new Map();
 
 async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, height }, parentRecordId) {
-  // Image order for face swapping:
-  // - Face reference appears 3 times for maximum weight
-  // - Then target pose image as subject
+  // Image order for face swapping - prioritize pose/body/hair from reference:
+  // - Pose image appears FIRST and THREE times (dominant)
+  // - Face reference appears ONCE (just for facial features)
   // - Then any additional reference images
   let images;
   if (refDataUrls && refDataUrls.length > 0) {
-    // Give face reference maximum weight by including it 3 times
     images = [
-      refDataUrls[0],  // Face reference #1
-      refDataUrls[0],  // Face reference #2
-      refDataUrls[0],  // Face reference #3
-      subjectDataUrl,  // Target pose/body image
+      subjectDataUrl,  // Target pose/body/hair image #1 (PRIORITY)
+      subjectDataUrl,  // Target pose/body/hair image #2
+      subjectDataUrl,  // Target pose/body/hair image #3
+      refDataUrls[0],  // Face reference (just face, not hair)
       ...refDataUrls.slice(1)  // Any additional references
     ].filter(Boolean);
   } else {
@@ -142,9 +141,9 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
     max_images: 1,
     enable_base64_output: false,
     enable_sync_mode: false,
-    seed: 42,
-    prompt: 'Perfect face and hair transfer: copy the complete facial identity AND hair (hair color, hair style, hair texture) from img1 onto the person in img2. Preserve exact pose, body position, clothing, accessories, background, lighting from img2. Natural skin texture with visible pores, realistic lighting, unretouched look, authentic photography. Match the exact body angle and position from img2 including back views, side angles, and all body parts visible in the reference.',
-    negative_prompt: 'wrong face, different facial features, wrong hair color, blonde hair when source has dark hair, different hair color than source, plastic skin, overly smooth skin, airbrushed look, fake texture, artificial smoothing, wrong person, face variations, missing body parts, incomplete pose, different angle than reference, cropped limbs, simplified pose.',
+    seed: Math.floor(Math.random() * 1000000),
+    prompt: 'Face replacement only: Take ONLY the face (facial features, skin tone) from img1 and place it onto img2. Everything else must be 100% from img2: hair color, hair style, hair texture, hair length, bangs, body, pose, angle, background, lighting, composition, freckles, skin details. Do not blend hair between images. Keep img2 hair completely unchanged. Match exact body proportions from img2. Copy exact camera angle from img2. Professional face swap, photorealistic, seamless integration.',
+    negative_prompt: 'blended hair, mixed hair color, blonde streaks when source has dark hair, different hair color than img2, different hair style than img2, wrong hair texture, added bangs, removed bangs, different body proportions, oversized head, undersized head, different pose, different angle, different expression, plastic skin, over-smooth skin, wrong background, different freckle pattern than img2, added freckles not in img2, removed freckles from img2, tattoos.',
     images: images
   };
 
