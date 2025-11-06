@@ -138,13 +138,13 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
   }
 
   const payload = {
-    size: '3072*4096',
+    size: `${width}*${height}`,
     max_images: 1,
     enable_base64_output: false,
     enable_sync_mode: false,
     seed: 42,
-    prompt: 'Perfect face swap: transfer the complete facial identity from img1 (face shape, eyes, nose, lips, skin tone, facial structure, expression) onto the person in img2. Preserve everything from img2: exact body pose, clothing, accessories, background, lighting, and composition. Seamlessly blend img1 face into img2 scene. Photorealistic, natural lighting, high detail, consistent quality, perfect face match.',
-    negative_prompt: 'wrong face, different facial features, inconsistent face identity, mismatched skin tone, blurry face, distorted features, low quality, different pose from reference, different background, different clothes on face source, artificial look, unrealistic, multiple faces, face variations, wrong person, bad face swap.',
+    prompt: 'Perfect face and hair transfer: copy the complete facial identity AND hair (hair color, hair style, hair texture) from img1 onto the person in img2. Preserve exact pose, body position, clothing, accessories, background, lighting from img2. Natural skin texture with visible pores, realistic lighting, unretouched look, authentic photography. Match the exact body angle and position from img2 including back views, side angles, and all body parts visible in the reference.',
+    negative_prompt: 'wrong face, different facial features, wrong hair color, blonde hair when source has dark hair, different hair color than source, plastic skin, overly smooth skin, airbrushed look, fake texture, artificial smoothing, wrong person, face variations, missing body parts, incomplete pose, different angle than reference, cropped limbs, simplified pose.',
     images: images
   };
 
