@@ -143,8 +143,8 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
     enable_base64_output: false,
     enable_sync_mode: false,
     seed: 42,
-    prompt: 'Perfect face and hair transfer: copy the complete facial identity AND hair (hair color, hair style, hair texture) from img1 onto the person in img2. Preserve exact pose, body position, clothing, accessories, background, lighting from img2. Natural skin texture with visible pores, realistic lighting, unretouched look, authentic photography. Match the exact body angle and position from img2 including back views, side angles, and all body parts visible in the reference.',
-    negative_prompt: 'wrong face, different facial features, wrong hair color, blonde hair when source has dark hair, different hair color than source, plastic skin, overly smooth skin, airbrushed look, fake texture, artificial smoothing, wrong person, face variations, missing body parts, incomplete pose, different angle than reference, cropped limbs, simplified pose.',
+    prompt: 'refer to this image: copy ONLY the face identity, skin tone, and hair color from img1, but take the EXACT facial expression, emotion, head tilt, pose, and body proportions and body position from img2, replicate the exact background, angle and lighting from img2, amateur photo, natural lighting, visible skin texture.',
+    negative_prompt: 'text, variations, different background, different lightning, inconsistent, caption, watermark, logo, emoji, subtitles, overlay, banner, stickers, piercings, tattoos, handwriting, neutral expression, different facial expression, closed eyes when source has open eyes, different head position.',
     images: images
   };
 
