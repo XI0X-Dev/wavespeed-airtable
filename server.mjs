@@ -144,7 +144,7 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
     enable_sync_mode: false,
     seed: 42,
     prompt: 'refer to this image: copy ONLY the face identity, skin tone, and hair color from img1, but take the EXACT facial expression, emotion, head position, pose, and body proportions and body position from img2, replicate the exact background, angle and lighting from img2, amateur photo, natural lighting, visible skin texture.',
-    negative_prompt: 'text, variations, different background, different lightning, inconsistent, caption, watermark, logo, emoji, subtitles, overlay, banner, stickers, piercings, tattoos, handwriting, neutral expression, different facial expression, closed eyes when source has open eyes, different head position.',
+    negative_prompt: 'no text, variations, different background, different lightning, inconsistent, caption, watermark, logo, emoji, subtitles, text overlay, banner, stickers, piercings, tattoos, handwriting, neutral expression, different facial expression, closed eyes when source has open eyes, different head position.',
     images: images
   };
 
