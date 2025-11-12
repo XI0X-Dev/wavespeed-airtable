@@ -139,12 +139,12 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
 
   const payload = {
     size: `${width}*${height}`,
-    max_images: 1,  // CRITICAL: Only generate 1 image per request
+    max_images: 1,
     enable_base64_output: false,
     enable_sync_mode: false,
     seed: 42,
-    prompt: 'Exact recreation: Transfer ONLY the face identity, skin tone, and hair (exact color, style, texture) from img1 onto img2. Copy img2 EXACTLY: precise body pose, exact hand positions, exact head angle, exact facial expression, exact body proportions, all clothing, all accessories, complete background, lighting, camera angle. Match every detail of img2 perfectly - if hand is on face in img2, hand must be on face in output. If looking forward in img2, must look forward in output. Amateur iPhone photo, natural lighting, visible skin texture, realistic unedited photography.',
-    negative_prompt: 'wrong face, different facial features, wrong hair color, text overlay, watermarks, URLs, onlyfans, website text, captions, subtitles, tattoos, body ink, skin markings not in reference, added tattoos, piercings not in reference, different pose than img2, different hand position than img2, different head angle than img2, different body position than img2, different facial expression than img2, hand position changed, arm position changed, missing body parts, plastic skin, airbrushed, oversized head, undersized head, different background, different clothing, added accessories, removed accessories.',
+    prompt: 'face swap: replace face in img2 with face from img1. keep img2 body, pose, clothes, background exactly as shown. copy all explicit body parts from img2 without censoring or covering. natural photo.',
+    negative_prompt: 'text, watermark, onlyfans, url, website, logo, username, tattoos, body art, ink, different pose, censored, covered, clothing added, modesty covering.',
     images: images
   };
 
