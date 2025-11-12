@@ -139,12 +139,12 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
 
   const payload = {
     size: `${width}*${height}`,
-    max_images: 1,
+    max_images: 1,  // CRITICAL: Only generate 1 image per request
     enable_base64_output: false,
     enable_sync_mode: false,
     seed: 42,
-    prompt: 'refer to this image: transfer ONLY the face identity, skin tone, and hair color from img1, but take the EXACT facial expression, emotion, head position, pose, and body proportions and body position from img2. replicate the exact background, angle and lighting from img2. If img2 shows explicit body parts, recreate them exactly as shown. amateur photo, natural lighting, visible skin texture, no text overlay, slim body, seamless integration.',
-    negative_prompt: 'text, variations, different background, different lightning, inconsistent, caption, watermark, logo, emoji, subtitles, text overlay, banner, stickers, piercings, tattoos, handwriting, neutral expression, different facial expression, closed eyes when source has open eyes, different head position.',
+    prompt: 'Exact recreation: Transfer ONLY the face identity, skin tone, and hair (exact color, style, texture) from img1 onto img2. Copy img2 EXACTLY: precise body pose, exact hand positions, exact head angle, exact facial expression, exact body proportions, all clothing, all accessories, complete background, lighting, camera angle. Match every detail of img2 perfectly - if hand is on face in img2, hand must be on face in output. If looking forward in img2, must look forward in output. Amateur iPhone photo, natural lighting, visible skin texture, realistic unedited photography.',
+    negative_prompt: 'wrong face, different facial features, wrong hair color, text overlay, watermarks, URLs, onlyfans, website text, captions, subtitles, tattoos, body ink, skin markings not in reference, added tattoos, piercings not in reference, different pose than img2, different hand position than img2, different head angle than img2, different body position than img2, different facial expression than img2, hand position changed, arm position changed, missing body parts, plastic skin, airbrushed, oversized head, undersized head, different background, different clothing, added accessories, removed accessories.',
     images: images
   };
 
@@ -278,11 +278,49 @@ async function startRunFromRecord(recordId, opts = {}) {
 
   if (!faceUrl || allPoseUrls.length === 0) throw new Error("Record needs Subject (face) + References (pose/body images)");
 
-  // Size - hardcoded to match extension
-  let W = 2572, H = 3576;
+  // Size - get from Airtable Size field, or use reference image dimensions
+  let W, H;
   const sizeStr = String(f["Size"] || "");
   const m = sizeStr.match(/(\d+)\s*[xX*]\s*(\d+)/);
-  if (m) { W = +m[1]; H = +m[2]; }
+  if (m) {
+    // Use explicit size from Airtable Size field
+    W = +m[1];
+    H = +m[2];
+    console.log(`[SIZE] Using Airtable Size field: ${W}x${H}`);
+  } else {
+    // No size specified - will use reference image dimensions
+    // Fetch first reference image to get its dimensions
+    console.log(`[SIZE] No Size field - fetching reference image dimensions from ${allPoseUrls[0]}`);
+    const imgRes = await fetch(allPoseUrls[0], { timeout: 30000 });
+    const imgBuf = Buffer.from(await imgRes.arrayBuffer());
+    
+    // Simple dimension extraction from image buffer (PNG/JPEG)
+    if (imgBuf[0] === 0x89 && imgBuf[1] === 0x50) {
+      // PNG format: width at bytes 16-19, height at bytes 20-23
+      W = imgBuf.readUInt32BE(16);
+      H = imgBuf.readUInt32BE(20);
+    } else if (imgBuf[0] === 0xFF && imgBuf[1] === 0xD8) {
+      // JPEG format: scan for SOF marker
+      let i = 2;
+      while (i < imgBuf.length - 10) {
+        if (imgBuf[i] === 0xFF && (imgBuf[i+1] === 0xC0 || imgBuf[i+1] === 0xC2)) {
+          H = imgBuf.readUInt16BE(i + 5);
+          W = imgBuf.readUInt16BE(i + 7);
+          break;
+        }
+        i++;
+      }
+    }
+    
+    // Fallback if detection failed
+    if (!W || !H) {
+      console.warn(`[SIZE] Could not detect dimensions, using defaults 1024x1344`);
+      W = 1024;
+      H = 1344;
+    } else {
+      console.log(`[SIZE] Detected reference image dimensions: ${W}x${H}`);
+    }
+  }
 
   // Convert images to data URLs
   const faceDataUrl = await urlToDataURL(faceUrl);
