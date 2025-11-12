@@ -143,8 +143,8 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
     enable_base64_output: false,
     enable_sync_mode: false,
     seed: 42,
-    prompt: 'face swap: replace face in img2 with face from img1. keep img2 body, pose, clothes, background exactly as shown. copy all explicit body parts from img2 without censoring or covering. natural photo.',
-    negative_prompt: 'text, watermark, onlyfans, url, website, logo, username, tattoos, body art, ink, different pose, censored, covered, clothing added, modesty covering.',
+    prompt: 'refer to this image: copy ONLY the face identity, skin tone, and hair color from img1, but take the EXACT facial expression, emotion, head position, pose, and body proportions and body position from img2, replicate the exact background, angle and lighting from img2. If img2 shows explicit body parts, recreate them exactly as shown. Natural amateur photography, iPhone quality, visible skin texture, realistic lighting, seamless integration.',
+    negative_prompt: 'text, variations, different background, different lightning, inconsistent, caption, watermark, logo, emoji, subtitles, text overlay, banner, stickers, piercings, tattoos, handwriting, neutral expression, different facial expression, closed eyes when source has open eyes, different head position.',
     images: images
   };
 
@@ -278,49 +278,11 @@ async function startRunFromRecord(recordId, opts = {}) {
 
   if (!faceUrl || allPoseUrls.length === 0) throw new Error("Record needs Subject (face) + References (pose/body images)");
 
-  // Size - get from Airtable Size field, or use reference image dimensions
-  let W, H;
+  // Size - hardcoded to match extension
+  let W = 2572, H = 3576;
   const sizeStr = String(f["Size"] || "");
   const m = sizeStr.match(/(\d+)\s*[xX*]\s*(\d+)/);
-  if (m) {
-    // Use explicit size from Airtable Size field
-    W = +m[1];
-    H = +m[2];
-    console.log(`[SIZE] Using Airtable Size field: ${W}x${H}`);
-  } else {
-    // No size specified - will use reference image dimensions
-    // Fetch first reference image to get its dimensions
-    console.log(`[SIZE] No Size field - fetching reference image dimensions from ${allPoseUrls[0]}`);
-    const imgRes = await fetch(allPoseUrls[0], { timeout: 30000 });
-    const imgBuf = Buffer.from(await imgRes.arrayBuffer());
-    
-    // Simple dimension extraction from image buffer (PNG/JPEG)
-    if (imgBuf[0] === 0x89 && imgBuf[1] === 0x50) {
-      // PNG format: width at bytes 16-19, height at bytes 20-23
-      W = imgBuf.readUInt32BE(16);
-      H = imgBuf.readUInt32BE(20);
-    } else if (imgBuf[0] === 0xFF && imgBuf[1] === 0xD8) {
-      // JPEG format: scan for SOF marker
-      let i = 2;
-      while (i < imgBuf.length - 10) {
-        if (imgBuf[i] === 0xFF && (imgBuf[i+1] === 0xC0 || imgBuf[i+1] === 0xC2)) {
-          H = imgBuf.readUInt16BE(i + 5);
-          W = imgBuf.readUInt16BE(i + 7);
-          break;
-        }
-        i++;
-      }
-    }
-    
-    // Fallback if detection failed
-    if (!W || !H) {
-      console.warn(`[SIZE] Could not detect dimensions, using defaults 1024x1344`);
-      W = 1024;
-      H = 1344;
-    } else {
-      console.log(`[SIZE] Detected reference image dimensions: ${W}x${H}`);
-    }
-  }
+  if (m) { W = +m[1]; H = +m[2]; }
 
   // Convert images to data URLs
   const faceDataUrl = await urlToDataURL(faceUrl);
