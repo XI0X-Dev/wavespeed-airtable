@@ -118,19 +118,24 @@ function authHeader() {
 // requestId -> parentRecordId
 const memoryRequestMap = new Map();
 
-async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, additionalRefDataUrls = [], width, height }, parentRecordId) {
-  // Image ordering for multi-face reference:
-  // - Face references (1-3 images of the model)
-  // - Target pose/body image (what we're recreating)
-  // - Any additional pose references
-  
-  const images = [
-    ...refDataUrls,              // Face references (1-3 images)
-    subjectDataUrl,              // Target pose/body image
-    ...additionalRefDataUrls     // Additional pose references (if any)
-  ].filter(Boolean);
-
-  console.log(`[IMAGE ORDER] ${refDataUrls.length} face refs + 1 target + ${additionalRefDataUrls.length} additional = ${images.length} total images`);
+async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, height }, parentRecordId) {
+  // Image order for face swapping:
+  // - First reference (face) appears 3 times for maximum weight
+  // - Then target pose image as subject
+  // - Then any additional reference images
+  let images;
+  if (refDataUrls && refDataUrls.length > 0) {
+    // Give face reference maximum weight by including it 3 times
+    images = [
+      refDataUrls[0],  // Face reference #1
+      refDataUrls[0],  // Face reference #2
+      refDataUrls[0],  // Face reference #3
+      subjectDataUrl,  // Target pose/body image
+      ...refDataUrls.slice(1)  // Any additional references
+    ].filter(Boolean);
+  } else {
+    images = [subjectDataUrl];
+  }
 
   const payload = {
     size: `${width}*${height}`,
@@ -138,8 +143,8 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, additiona
     enable_base64_output: false,
     enable_sync_mode: false,
     seed: 42,
-    prompt: 'face swap: replace face in img2 with face from img1. keep img2 body, pose, clothes, background exactly as shown. copy all explicit body parts from img2 without censoring or covering. natural photo.',
-    negative_prompt: 'text, watermark, onlyfans, url, website, logo, username, tattoos, body art, ink, different pose, censored, covered, clothing added, modesty covering.',
+    prompt: 'face swap: use face from img1, recreate img2 exactly. keep all body parts, pose, clothes, background from img2. no censoring.',
+    negative_prompt: 'text, variations, different background, different lightning, inconsistent, caption, watermark, logo, emoji, subtitles, text overlay, banner, stickers, piercings, tattoos, handwriting, neutral expression, different facial expression, closed eyes when source has open eyes, different head position.',
     images: images
   };
 
@@ -264,102 +269,31 @@ async function startRunFromRecord(recordId, opts = {}) {
   const rec = await atGet(recordId);
   const f = rec.fields || {};
 
-  // Subject = FACE images (1-3 photos of the model for identity)
-  // References = BODY/POSE images (target scenes to recreate)
-  
-  // Get all face reference images from Subject field
-  const subjectImages = Array.isArray(f["Subject"]) ? f["Subject"].map(x => x.url) : [];
-  const subjectUrlField = f["Subject URL"] ? [f["Subject URL"]] : [];
-  const allFaceUrls = [...subjectImages, ...subjectUrlField].filter(Boolean);
-  
-  // Get all pose/body images from References field
+  // Subject = FACE image (what we want to transfer)
+  // References = BODY/POSE images (target scenes)
+  const faceUrl = f["Subject"]?.[0]?.url || f["Subject URL"] || "";
   const poseImages = Array.isArray(f["References"]) ? f["References"].map(x => x.url) : [];
   const refCsv = splitCSV(f["Reference URLs"] || "");
   const allPoseUrls = [...poseImages, ...refCsv].filter(Boolean);
 
-  if (allFaceUrls.length === 0 || allPoseUrls.length === 0) {
-    throw new Error("Record needs Subject (1-3 face photos) + References (pose/body images)");
-  }
+  if (!faceUrl || allPoseUrls.length === 0) throw new Error("Record needs Subject (face) + References (pose/body images)");
 
-  console.log(`[IMAGES] Found ${allFaceUrls.length} face reference(s) and ${allPoseUrls.length} pose reference(s)`);
-
-  // Size - get from Airtable Size field, or use reference image dimensions
-  let W, H;
+  // Size - hardcoded to match extension
+  let W = 2572, H = 3576;
   const sizeStr = String(f["Size"] || "");
   const m = sizeStr.match(/(\d+)\s*[xX*]\s*(\d+)/);
-  if (m) {
-    // Use explicit size from Airtable Size field
-    W = +m[1];
-    H = +m[2];
-    console.log(`[SIZE] Using Airtable Size field: ${W}x${H}`);
-  } else {
-    // No size specified - will use reference image dimensions
-    // Fetch first reference image to get its dimensions
-    console.log(`[SIZE] No Size field - fetching reference image dimensions from ${allPoseUrls[0]}`);
-    const imgRes = await fetch(allPoseUrls[0], { timeout: 30000 });
-    const imgBuf = Buffer.from(await imgRes.arrayBuffer());
-    
-    // Simple dimension extraction from image buffer (PNG/JPEG)
-    if (imgBuf[0] === 0x89 && imgBuf[1] === 0x50) {
-      // PNG format: width at bytes 16-19, height at bytes 20-23
-      W = imgBuf.readUInt32BE(16);
-      H = imgBuf.readUInt32BE(20);
-    } else if (imgBuf[0] === 0xFF && imgBuf[1] === 0xD8) {
-      // JPEG format: scan for SOF marker
-      let i = 2;
-      while (i < imgBuf.length - 10) {
-        if (imgBuf[i] === 0xFF && (imgBuf[i+1] === 0xC0 || imgBuf[i+1] === 0xC2)) {
-          H = imgBuf.readUInt16BE(i + 5);
-          W = imgBuf.readUInt16BE(i + 7);
-          break;
-        }
-        i++;
-      }
-    }
-    
-    // Fallback if detection failed
-    if (!W || !H) {
-      console.warn(`[SIZE] Could not detect dimensions, using defaults 1024x1344`);
-      W = 1024;
-      H = 1344;
-    } else {
-      console.log(`[SIZE] Detected reference image dimensions: ${W}x${H}`);
-    }
-  }
+  if (m) { W = +m[1]; H = +m[2]; }
 
-  // Convert ALL face images to data URLs (support 1-3 face references)
-  const faceDataUrls = [];
-  for (const faceUrl of allFaceUrls) {
-    try {
-      faceDataUrls.push(await urlToDataURL(faceUrl));
-    } catch (e) {
-      console.warn("[FACE WARN]", faceUrl, e.message);
-    }
-  }
-
-  if (faceDataUrls.length === 0) {
-    throw new Error("Failed to load any face reference images");
-  }
-
-  // If only 1 face reference provided, duplicate it 3x for weight (old behavior)
-  // If 2-3 face references provided, use them all (new behavior)
-  const refDataUrls = faceDataUrls.length === 1 
-    ? [faceDataUrls[0], faceDataUrls[0], faceDataUrls[0]] // Duplicate single face 3x
-    : faceDataUrls; // Use all provided faces
-
-  console.log(`[FACE REF] Using ${refDataUrls.length} face reference images`);
+  // Convert images to data URLs
+  const faceDataUrl = await urlToDataURL(faceUrl);
+  const refDataUrls = [faceDataUrl]; // Face as reference (will be duplicated for weight)
 
   // First pose image becomes subject
   const subjectDataUrl = await urlToDataURL(allPoseUrls[0]);
 
   // Additional pose images as extra references (if any)
-  const additionalRefs = [];
   for (let i = 1; i < allPoseUrls.length; i++) {
-    try { 
-      additionalRefs.push(await urlToDataURL(allPoseUrls[i])); 
-    } catch (e) { 
-      console.warn("[REF WARN]", allPoseUrls[i], e.message); 
-    }
+    try { refDataUrls.push(await urlToDataURL(allPoseUrls[i])); } catch (e) { console.warn("[REF WARN]", allPoseUrls[i], e.message); }
   }
 
   // Status reset
@@ -373,14 +307,7 @@ async function startRunFromRecord(recordId, opts = {}) {
     let rid = null, lastErr = null;
     for (let a = 0; a < SUBMIT_MAX_RETRIES && !rid; a++) {
       try {
-        rid = await submitGeneration({ 
-          prompt: "", 
-          subjectDataUrl, 
-          refDataUrls, 
-          additionalRefDataUrls: additionalRefs,
-          width: W, 
-          height: H 
-        }, recordId);
+        rid = await submitGeneration({ prompt: "", subjectDataUrl, refDataUrls, width: W, height: H }, recordId);
       } catch (err) {
         lastErr = err; await sleep(backoff(a, SUBMIT_BASE_DELAY_MS));
       }
