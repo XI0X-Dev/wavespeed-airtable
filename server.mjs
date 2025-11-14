@@ -143,7 +143,7 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
     enable_base64_output: false,
     enable_sync_mode: false,
     seed: 42,
-    prompt: 'face swap: use face from img1, recreate img2 exactly. keep all body parts, pose, clothes, background from img2. no censoring.',
+    prompt: 'Recreate img2 using the face identity from img1. Transfer ONLY the facial features, skin tone, and hair (color, style, texture) from img1. Copy everything else exactly from img2: body proportions, pose, angle, clothing, accessories, background, lighting, composition. If img2 shows explicit body parts, recreate them exactly as shown. Natural amateur photography, iPhone quality, visible skin texture, realistic lighting, seamless integration.',
     negative_prompt: 'text, variations, different background, different lightning, inconsistent, caption, watermark, logo, emoji, subtitles, text overlay, banner, stickers, piercings, tattoos, handwriting, neutral expression, different facial expression, closed eyes when source has open eyes, different head position.',
     images: images
   };
