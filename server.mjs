@@ -119,28 +119,27 @@ function authHeader() {
 const memoryRequestMap = new Map();
 
 async function submitGeneration({ faceDataUrl, poseDataUrls, width, height }, parentRecordId) {
-  // IMAGE STRATEGY for maximum face consistency:
-  // Send face reference 2x for strong identity preservation
-  // img1 = face reference #1
-  // img2 = face reference #2  
-  // img3 = target pose/body/scene
+  // OPTIMAL STRATEGY: 3x face for maximum consistency
+  // img1, img2, img3 = face (strong identity lock)
+  // img4 = target (pose/scene to recreate)
   
   const images = [
-    faceDataUrl,      // img1: Face identity
-    faceDataUrl,      // img2: Face identity (for consistency)
-    poseDataUrls[0]   // img3: Target pose/body/scene
+    faceDataUrl,      // img1: Face
+    faceDataUrl,      // img2: Face
+    faceDataUrl,      // img3: Face (maximum consistency)
+    poseDataUrls[0]   // img4: Target
   ];
 
-  console.log(`[IMAGE ORDER] 2x face + 1 target = ${images.length} images for maximum face consistency`);
+  console.log(`[IMAGE ORDER] 3x face + 1 target = ${images.length} images for maximum face consistency`);
 
   const payload = {
     size: `${width}*${height}`,
     max_images: 1,
     enable_base64_output: false,
     enable_sync_mode: false,
-    seed: 42,  // Fixed seed for consistency (no variation)
-    prompt: 'Face swap: use exact face, skin tone, and hair (color, length, style, texture) from img1. Apply this face onto img3 body and scene. Keep everything from img3: exact pose, body shape, body proportions, hands position, clothing, accessories, background, lighting angle, camera angle, composition. Amateur iPhone photo, natural grain, unpolished, realistic imperfections, raw photography, visible noise, authentic texture.',
-    negative_prompt: 'polished, professional photography, studio quality, perfect skin, airbrushed, smooth, flawless, high-end camera, DSLR quality, professional lighting, retouched, enhanced, different face from img1, wrong skin tone from img1, wrong hair color from img1, different hair style from img1, text, watermark, logo, tattoos not in img1.',
+    seed: 42,
+    prompt: 'Face swap: transfer ONLY the facial identity, exact skin tone, and exact hair (color, style, length) from img1 onto img4. Keep EVERYTHING ELSE exactly from img4: precise body pose, exact hand positions, exact arm positions, exact head tilt, identical clothing items, all accessories, complete background, lighting setup, camera angle. Do not change pose. Do not change outfit. Do not change hands. Shot on iPhone, subtle natural grain.',
+    negative_prompt: 'excessive grain, overly noisy, too grainy, over-processed, artificial, fake, CGI, different face between outputs, inconsistent face, face variation, different pose from img4, hands in wrong position, different outfit from img4, clothing changed, missing clothing items, different accessories, polished, studio lighting, professional photo, perfect skin, smooth, airbrushed.',
     images: images
   };
 
