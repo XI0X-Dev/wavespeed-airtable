@@ -118,33 +118,29 @@ function authHeader() {
 // requestId -> parentRecordId
 const memoryRequestMap = new Map();
 
-async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, height }, parentRecordId) {
-  // Image order for face swapping:
-  // - First reference (face) appears 3 times for maximum weight
-  // - Then target pose image as subject
-  // - Then any additional reference images
-  let images;
-  if (refDataUrls && refDataUrls.length > 0) {
-    // Give face reference maximum weight by including it 3 times
-    images = [
-      refDataUrls[0],  // Face reference #1
-      refDataUrls[0],  // Face reference #2
-      refDataUrls[0],  // Face reference #3
-      subjectDataUrl,  // Target pose/body image
-      ...refDataUrls.slice(1)  // Any additional references
-    ].filter(Boolean);
-  } else {
-    images = [subjectDataUrl];
-  }
+async function submitGeneration({ faceDataUrl, poseDataUrls, width, height }, parentRecordId) {
+  // IMAGE STRATEGY for maximum face consistency:
+  // Send face reference 2x for strong identity preservation
+  // img1 = face reference #1
+  // img2 = face reference #2  
+  // img3 = target pose/body/scene
+  
+  const images = [
+    faceDataUrl,      // img1: Face identity
+    faceDataUrl,      // img2: Face identity (for consistency)
+    poseDataUrls[0]   // img3: Target pose/body/scene
+  ];
+
+  console.log(`[IMAGE ORDER] 2x face + 1 target = ${images.length} images for maximum face consistency`);
 
   const payload = {
     size: `${width}*${height}`,
     max_images: 1,
     enable_base64_output: false,
     enable_sync_mode: false,
-    seed: 42,
-    prompt: 'Recreate img2 using the face identity from img1. Transfer ONLY the facial features, skin tone, and hair (color, style, texture) from img1. Copy everything else exactly from img2: body proportions, pose, angle, clothing, accessories, background, lighting, composition. If img2 shows genitals, recreate them exactly as shown. Natural amateur photography, iPhone quality, visible skin texture, realistic lighting, seamless integration.',
-    negative_prompt: 'text, variations, different background, different pose, different lightning, inconsistent, caption, watermark, logo, emoji, subtitles, text overlay, banner, stickers, piercings, tattoos, handwriting, different head position.',
+    seed: 42,  // Fixed seed for consistency (no variation)
+    prompt: 'Face swap: use exact face, skin tone, and hair (color, length, style, texture) from img1. Apply this face onto img3 body and scene. Keep everything from img3: exact pose, body shape, body proportions, hands position, clothing, accessories, background, lighting angle, camera angle, composition. Amateur iPhone photo, natural grain, unpolished, realistic imperfections, raw photography, visible noise, authentic texture.',
+    negative_prompt: 'polished, professional photography, studio quality, perfect skin, airbrushed, smooth, flawless, high-end camera, DSLR quality, professional lighting, retouched, enhanced, different face from img1, wrong skin tone from img1, wrong hair color from img1, different hair style from img1, text, watermark, logo, tattoos not in img1.',
     images: images
   };
 
@@ -269,31 +265,72 @@ async function startRunFromRecord(recordId, opts = {}) {
   const rec = await atGet(recordId);
   const f = rec.fields || {};
 
-  // Subject = FACE image (what we want to transfer)
-  // References = BODY/POSE images (target scenes)
+  // Subject = BEST face image (pick the clearest one)
+  // References = BODY/POSE images (target scenes to recreate)
+  
   const faceUrl = f["Subject"]?.[0]?.url || f["Subject URL"] || "";
   const poseImages = Array.isArray(f["References"]) ? f["References"].map(x => x.url) : [];
   const refCsv = splitCSV(f["Reference URLs"] || "");
   const allPoseUrls = [...poseImages, ...refCsv].filter(Boolean);
 
-  if (!faceUrl || allPoseUrls.length === 0) throw new Error("Record needs Subject (face) + References (pose/body images)");
+  if (!faceUrl || allPoseUrls.length === 0) {
+    throw new Error("Record needs Subject (1 best face photo) + References (pose/body images)");
+  }
 
-  // Size - hardcoded to match extension
-  let W = 2572, H = 3576;
+  console.log(`[IMAGES] Using 1 face reference and ${allPoseUrls.length} pose reference(s)`);
+
+  // Size - get from Airtable Size field, or use reference image dimensions
+  let W, H;
   const sizeStr = String(f["Size"] || "");
   const m = sizeStr.match(/(\d+)\s*[xX*]\s*(\d+)/);
-  if (m) { W = +m[1]; H = +m[2]; }
+  if (m) {
+    W = +m[1];
+    H = +m[2];
+    console.log(`[SIZE] Using Airtable Size field: ${W}x${H}`);
+  } else {
+    console.log(`[SIZE] No Size field - fetching reference image dimensions from ${allPoseUrls[0]}`);
+    const imgRes = await fetch(allPoseUrls[0], { timeout: 30000 });
+    const imgBuf = Buffer.from(await imgRes.arrayBuffer());
+    
+    if (imgBuf[0] === 0x89 && imgBuf[1] === 0x50) {
+      W = imgBuf.readUInt32BE(16);
+      H = imgBuf.readUInt32BE(20);
+    } else if (imgBuf[0] === 0xFF && imgBuf[1] === 0xD8) {
+      let i = 2;
+      while (i < imgBuf.length - 10) {
+        if (imgBuf[i] === 0xFF && (imgBuf[i+1] === 0xC0 || imgBuf[i+1] === 0xC2)) {
+          H = imgBuf.readUInt16BE(i + 5);
+          W = imgBuf.readUInt16BE(i + 7);
+          break;
+        }
+        i++;
+      }
+    }
+    
+    if (!W || !H) {
+      console.warn(`[SIZE] Could not detect dimensions, using defaults 1024x1344`);
+      W = 1024;
+      H = 1344;
+    } else {
+      console.log(`[SIZE] Detected reference image dimensions: ${W}x${H}`);
+    }
+  }
 
-  // Convert images to data URLs
+  // Convert face to data URL
   const faceDataUrl = await urlToDataURL(faceUrl);
-  const refDataUrls = [faceDataUrl]; // Face as reference (will be duplicated for weight)
 
-  // First pose image becomes subject
-  const subjectDataUrl = await urlToDataURL(allPoseUrls[0]);
+  // Convert ALL pose images to data URLs
+  const poseDataUrls = [];
+  for (const poseUrl of allPoseUrls) {
+    try {
+      poseDataUrls.push(await urlToDataURL(poseUrl));
+    } catch (e) {
+      console.warn("[POSE WARN]", poseUrl, e.message);
+    }
+  }
 
-  // Additional pose images as extra references (if any)
-  for (let i = 1; i < allPoseUrls.length; i++) {
-    try { refDataUrls.push(await urlToDataURL(allPoseUrls[i])); } catch (e) { console.warn("[REF WARN]", allPoseUrls[i], e.message); }
+  if (poseDataUrls.length === 0) {
+    throw new Error("Failed to load any pose reference images");
   }
 
   // Status reset
@@ -307,7 +344,12 @@ async function startRunFromRecord(recordId, opts = {}) {
     let rid = null, lastErr = null;
     for (let a = 0; a < SUBMIT_MAX_RETRIES && !rid; a++) {
       try {
-        rid = await submitGeneration({ prompt: "", subjectDataUrl, refDataUrls, width: W, height: H }, recordId);
+        rid = await submitGeneration({ 
+          faceDataUrl, 
+          poseDataUrls, 
+          width: W, 
+          height: H 
+        }, recordId);
       } catch (err) {
         lastErr = err; await sleep(backoff(a, SUBMIT_BASE_DELAY_MS));
       }
