@@ -119,18 +119,15 @@ function authHeader() {
 const memoryRequestMap = new Map();
 
 async function submitGeneration({ faceDataUrl, poseDataUrls, width, height }, parentRecordId) {
-  // OPTIMAL STRATEGY: 3x face for maximum consistency
-  // img1, img2, img3 = face (strong identity lock)
-  // img4 = target (pose/scene to recreate)
-  
+  // OPTIMAL: 3x face for consistency, img4 = target
   const images = [
     faceDataUrl,      // img1: Face
     faceDataUrl,      // img2: Face
-    faceDataUrl,      // img3: Face (maximum consistency)
+    faceDataUrl,      // img3: Face
     poseDataUrls[0]   // img4: Target
   ];
 
-  console.log(`[IMAGE ORDER] 3x face + 1 target = ${images.length} images for maximum face consistency`);
+  console.log(`[IMAGE ORDER] 3x face + 1 target for maximum consistency`);
 
   const payload = {
     size: `${width}*${height}`,
@@ -138,8 +135,8 @@ async function submitGeneration({ faceDataUrl, poseDataUrls, width, height }, pa
     enable_base64_output: false,
     enable_sync_mode: false,
     seed: 42,
-    prompt: 'Face swap: transfer ONLY the facial identity, exact skin tone, and exact hair (color, style, length) from img1 onto img4. Keep EVERYTHING ELSE exactly from img4: precise body pose, exact hand positions, exact arm positions, exact head tilt, identical clothing items, all accessories, complete background, lighting setup, camera angle. Do not change pose. Do not change outfit. Do not change hands. Shot on iPhone, subtle natural grain.',
-    negative_prompt: 'excessive grain, overly noisy, too grainy, over-processed, artificial, fake, CGI, different face between outputs, inconsistent face, face variation, different pose from img4, hands in wrong position, different outfit from img4, clothing changed, missing clothing items, different accessories, polished, studio lighting, professional photo, perfect skin, smooth, airbrushed.',
+    prompt: 'Perfect face swap: Use ONLY facial features, EXACT skin tone, EXACT hair color and style from img1. Transfer img1 face onto img4 body. Copy EVERYTHING ELSE from img4: exact body pose, exact hand positions, exact arm positions, exact head tilt, exact body proportions, natural head-to-body ratio, identical clothing, all accessories, complete background, scene setting, camera angle, lighting. Do not add objects. Do not add cameras. Do not add phones unless img4 shows them. Natural iPhone photo quality, light grain.',
+    negative_prompt: 'wrong hair color, different hair from img1, wrong skin tone, darker skin than img1, lighter skin than img1, oversized head, head too big, disproportionate head, face too large, added camera, added phone, holding camera not in img4, holding phone not in img4, added objects, excessive grain, too grainy, very noisy, over-processed, CGI, artificial, different face, inconsistent face, different pose, wrong hand position, different outfit, clothing changed, polished, studio quality, professional photo.',
     images: images
   };
 
