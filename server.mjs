@@ -139,12 +139,12 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
 
   const payload = {
     size: `${width}*${height}`,
-    max_images: 1,
+    max_images: 3,
     enable_base64_output: false,
     enable_sync_mode: false,
     seed: 42,
-    prompt: 'Face swap task: Take face from img1, place on img4. CRITICAL: img1 provides ONLY face and exact skin tone. img4 provides EVERYTHING else - body position, camera view angle, all body parts visible, hands, pose, clothing, setting. Match img4 body orientation exactly. Replicate img4 as-is with img1 face.',
-    negative_prompt: 'different body orientation than img4, front view when img4 shows back view, back view when img4 shows front view, missing body parts from img4, covered body parts from img4, different camera angle, pose change, censored, clothed when img4 shows skin, tattoo, tattoos, ink, body tattoos, different skin tone than img1, lighter skin than img1, darker skin than img1, different hair than img1, excessive grain, very grainy, polished, perfect, airbrushed, professional photo, text, watermark.',
+    prompt: 'Replace face in img4 with face from img1. Preserve img1 skin and hair. Preserve img4 pose.',
+    negative_prompt: '',
     images: images
   };
 
