@@ -119,19 +119,14 @@ function authHeader() {
 const memoryRequestMap = new Map();
 
 async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, height }, parentRecordId) {
-  // Image order for face swapping:
-  // - First reference (face) appears 3 times for maximum weight
-  // - Then target pose image as subject
-  // - Then any additional reference images
   let images;
   if (refDataUrls && refDataUrls.length > 0) {
-    // Give face reference maximum weight by including it 3 times
     images = [
-      refDataUrls[0],  // Face reference #1
-      refDataUrls[0],  // Face reference #2
-      refDataUrls[0],  // Face reference #3
-      subjectDataUrl,  // Target pose/body image
-      ...refDataUrls.slice(1)  // Any additional references
+      refDataUrls[0],  // img1
+      refDataUrls[0],  // img2
+      refDataUrls[0],  // img3
+      subjectDataUrl,  // img4
+      ...refDataUrls.slice(1)
     ].filter(Boolean);
   } else {
     images = [subjectDataUrl];
@@ -139,19 +134,30 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
 
   const payload = {
     size: `${width}*${height}`,
-    max_images: 1,
+    max_images: 3,
     enable_base64_output: false,
     enable_sync_mode: false,
     seed: 42,
-    guidance_scale: 8.0,
+    
+    // ADD THESE PARAMETERS:
+    guidance_scale: 8.5,
     num_inference_steps: 50,
-    prompt: 'refer to this image: replicate exactly the face, skin tone and hair color from img1. And the pose, outfit, angle and background from img4. amateur photo, natural lighting, visible skin texture, medium distance.',
-    negative_prompt: '',
+    
+    prompt: 'refer to this image: copy only the face identity, skin tone, and hair color from img1. Take the outfit, background, and the exact facial expression, emotion and pose from img4. natural photo.',
+    negative_prompt: '',  // Confirmed useless
+    
     images: images
   };
 
   const url = new URL(`${WAVESPEED_BASE}${WAVESPEED_SUBMIT_PATH}`);
   url.searchParams.set("webhook", `${PUBLIC_BASE_URL}/webhooks/wavespeed`);
+
+  console.log('[SUBMIT] Payload:', JSON.stringify({
+    guidance_scale: payload.guidance_scale,
+    num_inference_steps: payload.num_inference_steps,
+    max_images: payload.max_images,
+    prompt: payload.prompt
+  }, null, 2));
 
   const res = await fetch(url.toString(), {
     method: "POST",
@@ -159,14 +165,42 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
     body: JSON.stringify(payload)
   });
 
-  if (!res.ok) throw new Error(`WaveSpeed submit failed: ${res.status} ${await res.text()}`);
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error('[API ERROR]', errorText);
+    
+    // If parameters rejected, try without them:
+    if (errorText.includes('guidance_scale') || errorText.includes('num_inference_steps')) {
+      console.warn('[RETRY] Parameters not supported, trying without...');
+      delete payload.guidance_scale;
+      delete payload.num_inference_steps;
+      
+      const retryRes = await fetch(url.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!retryRes.ok) {
+        throw new Error(`WaveSpeed submit failed: ${retryRes.status} ${await retryRes.text()}`);
+      }
+      const json = await retryRes.json();
+      const requestId = json?.data?.id || json?.requestId || json?.id || json?.request_id;
+      if (!requestId) throw new Error(`Missing requestId: ${JSON.stringify(json)}`);
+      if (parentRecordId) memoryRequestMap.set(requestId, parentRecordId);
+      return requestId;
+    }
+    
+    throw new Error(`WaveSpeed submit failed: ${res.status} ${errorText}`);
+  }
+  
   const json = await res.json();
-
   const requestId = json?.data?.id || json?.requestId || json?.id || json?.request_id;
-  if (!requestId) throw new Error(`Missing requestId in response: ${JSON.stringify(json)}`);
-
+  if (!requestId) throw new Error(`Missing requestId: ${JSON.stringify(json)}`);
+  
   if (parentRecordId) memoryRequestMap.set(requestId, parentRecordId);
   return requestId;
+}
 }
 
 async function getResult(requestId) {
