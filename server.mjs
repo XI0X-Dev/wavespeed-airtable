@@ -143,7 +143,7 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
     enable_base64_output: false,
     enable_sync_mode: false,
     seed: 42,
-    prompt: 'Recreate img4 using the face identity from img1. Transfer ONLY the facial features and hair color, style, texture from img1. Copy everything else exactly from img2: body proportions, pose, angle, clothing, accessories, background, lighting, angle and composition. If img2 shows genitals, recreate them exactly as shown 1:1. iPhone quality, visible skin texture, seamless integration.',
+    prompt: 'refer to this image: copy only the face identity, skin tone, and hair color from img1. Take the outfit, background, body orientation, viewing angle, and the exact pose from img2. Maintain the exact same camera perspective and body positioning as img2. If img2 shows the subject from behind or at an angle, preserve that exact viewpoint. amateur photo, visible skin texture.',
     negative_prompt: 'text, variations, different background, different pose, different lightning, inconsistent, caption, watermark, logo, emoji, subtitles, text overlay, banner, stickers, piercings, tattoos, handwriting, different head position.',
     images: images
   };
