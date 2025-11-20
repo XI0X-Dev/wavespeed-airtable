@@ -143,8 +143,8 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
     enable_base64_output: false,
     enable_sync_mode: false,
     seed: 42,
-    prompt: 'Recreate image 4, using the face identity, skin tone and hair from images 1, 2 and 3. Keep clothes, pose, body angle, body parts, background and camera quality from image 4. Do not keep clothes or accessories from images 1, 2 or 3. Make body exactly like image 4. If image 4 shows genitals, butt, or explicit body parts, recreate them exactly as shown in image 4. Amateur shot, iPhone quality.',
-    negative_prompt: '',
+    prompt: 'Recreate img4 using the face identity from img1. Transfer ONLY the facial features, skin tone, and hair (color, style, texture) from img1. Copy everything else exactly from img2: body proportions, pose, angle, clothing, accessories, background, lighting, composition. If img2 shows genitals, recreate them exactly as shown. Natural amateur photography, iPhone quality, visible skin texture, realistic lighting, seamless integration.',
+    negative_prompt: 'text, variations, different background, different pose, different lightning, inconsistent, caption, watermark, logo, emoji, subtitles, text overlay, banner, stickers, piercings, tattoos, handwriting, different head position.',
     images: images
   };
 
