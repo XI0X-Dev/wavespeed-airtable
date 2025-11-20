@@ -143,9 +143,7 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
     enable_base64_output: false,
     enable_sync_mode: false,
     seed: 42,
-    guidance_scale: 9.0,
-    num_inference_steps: 50,
-    prompt: 'refer to this image: replicate exactly the face, skin tone and hair color from img1. And the pose, outfit, angle and background from img4. amateur photo, natural lighting, visible skin texture, medium distance.',
+    prompt: 'img1, img2, img3 = FACE IDENTITY ONLY. Do not copy their pose, head tilt, expression, or eye direction. img4 = FULL POSE REFERENCE. Match the head angle, face rotation, eye gaze direction, body posture, body angle, hands position, all body parts visible, clothing, background, lighting from img4 exactly. Do NOT re-center the face. Do NOT turn the face to look at the camera unless img4 does. Do NOT change head tilt or eye gaze. Match only the facial identity (shape of eyes, lips, jawline, nose, EXACT skin tone, EXACT hair color) from face reference images. Amateur shot. Real smartphone camera. Slight imperfections in skin texture. Natural lighting.',
     negative_prompt: '',
     images: images
   };
