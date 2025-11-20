@@ -143,8 +143,8 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
     enable_base64_output: false,
     enable_sync_mode: false,
     seed: 42,
-    prompt: 'Recreate img2 using the face identity from img1. Transfer ONLY the facial features, skin tone, and hair (color, style, texture) from img1. Copy everything else exactly from img2: body proportions, pose, angle, clothing, accessories, background, lighting, composition. If img2 shows genitals, recreate them exactly as shown. Natural amateur photography, iPhone quality, visible skin texture, realistic lighting, seamless integration.',
-    negative_prompt: 'text, variations, different background, different pose, different lightning, inconsistent, caption, watermark, logo, emoji, subtitles, text overlay, banner, stickers, piercings, tattoos, handwriting, different head position.',
+    prompt: 'Replace face in img4 with face from img1; keep img1 exact skin tone, hair color, hair style. Preserve img4 pose, body position, hands, clothing, lighting, background exactly as shown. iPhone photo, natural imperfections.',
+    negative_prompt: 'wrong skin tone, different skin from img1, added tattoos, added piercings, different pose, different hands, different body position, polished, airbrushed, perfect skin, studio lighting, professional photo, different background, different clothing, text, watermark.',
     images: images
   };
 
