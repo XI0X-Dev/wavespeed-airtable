@@ -143,8 +143,10 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
     enable_base64_output: false,
     enable_sync_mode: false,
     seed: 42,
-    prompt: 'refer to this image: copy only the face identity skin tone, and hair color from img1. Take the outfit, background, and the exact facial expression, emotion and pose from img4. amateur photo, natural lighting, visible skin texture.',
-    negative_prompt: 'tattoos.',
+    guidance_scale: 8.0,
+    num_inference_steps: 50,
+    prompt: 'Face swap: img1 face onto img4. Keep img1 skin tone and hair color. Keep img4 body position and camera angle.',
+    negative_prompt: 'tattoo, different skin, different hair, different angle.',
     images: images
   };
 
