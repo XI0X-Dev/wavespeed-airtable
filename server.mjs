@@ -139,12 +139,12 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
 
   const payload = {
     size: `${width}*${height}`,
-    max_images: 3,
+    max_images: 1,
     enable_base64_output: false,
     enable_sync_mode: false,
     seed: 42,
-    prompt: 'Replace face in img4 with face from img1. Preserve img1 skin and hair. Preserve img4 pose.',
-    negative_prompt: '',
+    prompt: 'refer to this image: copy only the face identity skin tone, and hair color from img1. Take the outfit, background, and the exact facial expression, emotion and pose from img4. amateur photo, natural lighting, visible skin texture.',
+    negative_prompt: 'tattoos.',
     images: images
   };
 
