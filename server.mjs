@@ -143,7 +143,7 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
     enable_base64_output: false,
     enable_sync_mode: false,
     seed: 42,
-    prompt: 'Recreate image 4, using the face identity, skin tone and hair from images 1, 2 and 3. Keep clothes, pose, body angle, body parts, background and camera quality from image 4. Do not keep clothes or accessories from images 1, 2 or 3. Make body exactly like image 4.',
+    prompt: 'Recreate image 4, using the face identity, skin tone and hair from images 1, 2 and 3. Keep clothes, pose, body angle, body parts, background and camera quality from image 4. Do not keep clothes or accessories from images 1, 2 or 3. Make body exactly like image 4. If image 4 shows genitals, butt, or explicit body parts, recreate them exactly as shown in image 4. Amateur shot, iPhone quality.',
     negative_prompt: '',
     images: images
   };
