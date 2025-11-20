@@ -143,8 +143,8 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
     enable_base64_output: false,
     enable_sync_mode: false,
     seed: 42,
-    prompt: 'Face swap: Apply img1 face onto img4 body. Use img1 skin tone, img1 hair. Copy img4 exactly: pose, hands, arms, body angle, clothing, background, lighting. Keep img4 composition unchanged. iPhone photo quality.',
-    negative_prompt: 'tattoos, tattoo, tattooed skin, ink, body art, piercings, piercing, different skin tone than img1, wrong skin color, different hair color than img1, different pose than img4, pose variation, different angle than img4, camera angle change, different hands position, different arms position, different body angle, changed composition, background change, clothing change, excessive grain, heavy grain, very grainy, film grain, noise, over-processed, polished, airbrushed, studio photo, professional lighting, perfect, flawless, smooth, enhanced, retouched, text, watermark, logo.',
+    prompt: 'Face swap task: Take face from img1, place on img4. CRITICAL: img1 provides ONLY face and exact skin tone. img4 provides EVERYTHING else - body position, camera view angle, all body parts visible, hands, pose, clothing, setting. Match img4 body orientation exactly. Replicate img4 as-is with img1 face.',
+    negative_prompt: 'different body orientation than img4, front view when img4 shows back view, back view when img4 shows front view, missing body parts from img4, covered body parts from img4, different camera angle, pose change, censored, clothed when img4 shows skin, tattoo, tattoos, ink, body tattoos, different skin tone than img1, lighter skin than img1, darker skin than img1, different hair than img1, excessive grain, very grainy, polished, perfect, airbrushed, professional photo, text, watermark.',
     images: images
   };
 
