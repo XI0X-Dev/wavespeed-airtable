@@ -145,7 +145,7 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
     seed: 42,
     guidance_scale: 8.0,
     num_inference_steps: 50,
-    prompt: 'refer to this image: copy ONLY the face identity, skin tone, and hair color from img1, but take the EXACT facial expression, emotion, head position, pose, and body proportions and body position from img4, replicate the exact background, angle and lighting from img4, amateur photo, natural lighting, visible skin texture, no tattoos, no text overlay',
+    prompt: 'refer to this image: replicate exactly the face, skin tone and hair color from img1. And the pose, outfit, angle and background from img4. amateur photo, natural lighting, visible skin texture, medium distance.',
     negative_prompt: '',
     images: images
   };
