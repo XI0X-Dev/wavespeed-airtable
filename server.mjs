@@ -12,7 +12,7 @@ const {
   AIRTABLE_BASE_ID,
   AIRTABLE_TABLE = "Generations",
 
-  // WaveSpeed v3
+  // WaveSpeed v3 - Updated to v4.5/edit (non-sequential)
   WAVESPEED_BASE = "https://api.wavespeed.ai",
   WAVESPEED_SUBMIT_PATH = "/api/v3/bytedance/seedream-v4.5/edit",
   WAVESPEED_RESULT_PATH = "/api/v3/predictions",
@@ -29,7 +29,7 @@ const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json({ limit: "10mb" }));
 
-const MODEL_NAME = "Seedream v4 (edit-sequential)";
+const MODEL_NAME = "Seedream v4.5 (edit)";
 
 const SUBMIT_MAX_RETRIES = 3;
 const SUBMIT_BASE_DELAY_MS = 500;
@@ -118,38 +118,31 @@ function authHeader() {
 // requestId -> parentRecordId
 const memoryRequestMap = new Map();
 
-async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, height }, parentRecordId) {
-  // Image order for face swapping:
-  // - First reference (face) appears 3 times for maximum weight
-  // - Then target pose image as subject
-  // - Then any additional reference images
-  let images;
-  if (refDataUrls && refDataUrls.length > 0) {
-    // Give face reference maximum weight by including it 3 times
-    images = [
-      refDataUrls[0],  // Face reference #1
-      refDataUrls[0],  // Face reference #2
-      refDataUrls[0],  // Face reference #3
-      subjectDataUrl,  // Target pose/body image
-      ...refDataUrls.slice(1)  // Any additional references
-    ].filter(Boolean);
-  } else {
-    images = [subjectDataUrl];
+async function submitGeneration({ faceDataUrl, targetDataUrl, width, height }, parentRecordId) {
+  // v4.5/edit API - simple payload with just 2 images:
+  // - img1 = face source (identity to transfer)
+  // - img2 = target pose/body image (scene to recreate)
+  // NO duplicates - the API handles face weighting internally
+  
+  const images = [faceDataUrl, targetDataUrl].filter(Boolean);
+  
+  if (images.length < 2) {
+    throw new Error("Need both face image and target image");
   }
 
   const payload = {
-    size: `${width}*${height}`,
-    max_images: 1,
-    enable_base64_output: false,
-    enable_sync_mode: false,
-    seed: 42,
     prompt: 'Recreate img2 using the face identity from img1. Transfer ONLY the facial features and hair (color, style, texture) from img1. Copy everything else exactly from img2: body proportions, pose, angle, clothing, accessories, background, lighting, composition. If img2 shows genitals, recreate them exactly as shown. Natural amateur photography, iPhone quality, visible skin texture, realistic lighting, seamless integration.',
-    negative_prompt: 'text, variations, different background, different pose, different lightning, inconsistent, caption, watermark, logo, emoji, subtitles, text overlay, banner, stickers, piercings, tattoos, handwriting, different head position.',
-    images: images
+    images: images,
+    size: `${width}*${height}`,
+    enable_sync_mode: false,
+    enable_base64_output: false
   };
 
   const url = new URL(`${WAVESPEED_BASE}${WAVESPEED_SUBMIT_PATH}`);
   url.searchParams.set("webhook", `${PUBLIC_BASE_URL}/webhooks/wavespeed`);
+
+  console.log(`[SUBMIT] Sending to ${url.toString()}`);
+  console.log(`[SUBMIT] Images: ${images.length}, Size: ${width}*${height}`);
 
   const res = await fetch(url.toString(), {
     method: "POST",
@@ -157,8 +150,14 @@ async function submitGeneration({ prompt, subjectDataUrl, refDataUrls, width, he
     body: JSON.stringify(payload)
   });
 
-  if (!res.ok) throw new Error(`WaveSpeed submit failed: ${res.status} ${await res.text()}`);
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error(`[SUBMIT ERROR] ${res.status}: ${errorText}`);
+    throw new Error(`WaveSpeed submit failed: ${res.status} ${errorText}`);
+  }
+  
   const json = await res.json();
+  console.log(`[SUBMIT RESPONSE]`, JSON.stringify(json));
 
   const requestId = json?.data?.id || json?.requestId || json?.id || json?.request_id;
   if (!requestId) throw new Error(`Missing requestId in response: ${JSON.stringify(json)}`);
@@ -241,25 +240,24 @@ async function pollUntilDone(requestId, parentRecordId) {
 }
 
 /* ===================== UI (Demo) ===================== */
-app.get("/", (_, res) => res.send("WaveSpeed x Airtable is running. /app to start a batch, or trigger via Airtable button."));
+app.get("/", (_, res) => res.send("WaveSpeed x Airtable v4.5 is running. /app to start a batch, or trigger via Airtable button."));
 
 app.get("/app", (_, res) => {
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.end(`<!doctype html>
 <html><head><meta charset="utf-8"/><title>Batch Runner</title></head>
 <body style="font-family:system-ui;padding:24px;max-width:760px;margin:auto">
-<h1>Seedream v4 — Face Swap</h1>
+<h1>Seedream v4.5 — Face Swap</h1>
 <form method="POST" action="/generate-batch">
-<label>Prompt (optional - will use optimized default)</label><br/>
-<textarea name="prompt" rows="3"></textarea><br/><br/>
-<label>Face Image URL (source face)</label><br/>
-<input name="subject_url" type="url" required/><br/><br/>
-<label>Target Pose Image URL (body/pose/scene to recreate)</label><br/>
-<input name="reference_urls" type="text" required/><br/><br/>
-<label>Width</label><input name="width" type="number" value="1024" required/>
-<label style="margin-left:12px">Height</label><input name="height" type="number" value="1344" required/>
+<label>Face Image URL (source face - img1)</label><br/>
+<input name="face_url" type="url" required style="width:100%"/><br/><br/>
+<label>Target Pose Image URL (body/pose/scene - img2)</label><br/>
+<input name="target_url" type="url" required style="width:100%"/><br/><br/>
+<label>Width</label><input name="width" type="number" value="2572" required/>
+<label style="margin-left:12px">Height</label><input name="height" type="number" value="3576" required/>
 <label style="margin-left:12px">Batch</label><input name="batch_count" type="number" value="4" min="1" max="24" required/><br/><br/>
 <button type="submit">Start Batch</button>
+<p><small>Model: ${MODEL_NAME}</small></p>
 <p><small>Webhook: ${PUBLIC_BASE_URL}/webhooks/wavespeed</small></p>
 </form></body></html>`);
 });
@@ -269,57 +267,81 @@ async function startRunFromRecord(recordId, opts = {}) {
   const rec = await atGet(recordId);
   const f = rec.fields || {};
 
-  // Subject = FACE image (what we want to transfer)
-  // References = BODY/POSE images (target scenes)
+  // Subject = FACE image (what we want to transfer) - img1
+  // References = TARGET/POSE images (scenes to recreate) - img2
   const faceUrl = f["Subject"]?.[0]?.url || f["Subject URL"] || "";
   const poseImages = Array.isArray(f["References"]) ? f["References"].map(x => x.url) : [];
   const refCsv = splitCSV(f["Reference URLs"] || "");
-  const allPoseUrls = [...poseImages, ...refCsv].filter(Boolean);
+  const allTargetUrls = [...poseImages, ...refCsv].filter(Boolean);
 
-  if (!faceUrl || allPoseUrls.length === 0) throw new Error("Record needs Subject (face) + References (pose/body images)");
+  if (!faceUrl) throw new Error("Record needs Subject (face image)");
+  if (allTargetUrls.length === 0) throw new Error("Record needs References (target pose/body images)");
 
-  // Size - hardcoded to match extension
+  // Size - default to high resolution
   let W = 2572, H = 3576;
   const sizeStr = String(f["Size"] || "");
   const m = sizeStr.match(/(\d+)\s*[xX*]\s*(\d+)/);
   if (m) { W = +m[1]; H = +m[2]; }
 
-  // Convert images to data URLs
+  // Convert face image to data URL once (reused for all targets)
   const faceDataUrl = await urlToDataURL(faceUrl);
-  const refDataUrls = [faceDataUrl]; // Face as reference (will be duplicated for weight)
-
-  // First pose image becomes subject
-  const subjectDataUrl = await urlToDataURL(allPoseUrls[0]);
-
-  // Additional pose images as extra references (if any)
-  for (let i = 1; i < allPoseUrls.length; i++) {
-    try { refDataUrls.push(await urlToDataURL(allPoseUrls[i])); } catch (e) { console.warn("[REF WARN]", allPoseUrls[i], e.message); }
-  }
 
   // Status reset
-  await atPatch(recordId, { Status: "processing", "Request IDs": "", "Seen IDs": "", "Failed IDs": "", "Last Update": nowISO(), Model: MODEL_NAME, Size: `${W}x${H}` });
+  await atPatch(recordId, { 
+    Status: "processing", 
+    "Request IDs": "", 
+    "Seen IDs": "", 
+    "Failed IDs": "", 
+    "Last Update": nowISO(), 
+    Model: MODEL_NAME, 
+    Size: `${W}x${H}` 
+  });
 
-  // Batch-Count
-  const N = Math.max(1, Math.min(24, Number(f["Batch Count"] || opts.batch || 3)));
+  // Batch-Count per target image
+  const batchPerTarget = Math.max(1, Math.min(24, Number(f["Batch Count"] || opts.batch || 4)));
 
   const requestIds = [];
-  for (let i = 0; i < N; i++) {
-    let rid = null, lastErr = null;
-    for (let a = 0; a < SUBMIT_MAX_RETRIES && !rid; a++) {
-      try {
-        rid = await submitGeneration({ prompt: "", subjectDataUrl, refDataUrls, width: W, height: H }, recordId);
-      } catch (err) {
-        lastErr = err; await sleep(backoff(a, SUBMIT_BASE_DELAY_MS));
+  
+  // For each target image, generate batch_count variations
+  for (const targetUrl of allTargetUrls) {
+    let targetDataUrl;
+    try {
+      targetDataUrl = await urlToDataURL(targetUrl);
+    } catch (e) {
+      console.warn(`[TARGET WARN] Failed to fetch ${targetUrl}: ${e.message}`);
+      continue;
+    }
+
+    // Generate multiple outputs for this target
+    for (let i = 0; i < batchPerTarget; i++) {
+      let rid = null, lastErr = null;
+      for (let a = 0; a < SUBMIT_MAX_RETRIES && !rid; a++) {
+        try {
+          rid = await submitGeneration({ 
+            faceDataUrl, 
+            targetDataUrl, 
+            width: W, 
+            height: H 
+          }, recordId);
+        } catch (err) {
+          lastErr = err; 
+          await sleep(backoff(a, SUBMIT_BASE_DELAY_MS));
+        }
+      }
+      if (!rid) { 
+        console.error("[SUBMIT FAIL]", lastErr?.message || lastErr); 
+        continue; 
+      }
+      requestIds.push(rid);
+      if (requestIds.length < batchPerTarget * allTargetUrls.length) {
+        await sleep(JOB_SPACING_MS);
       }
     }
-    if (!rid) { console.error("[SUBMIT FAIL]", lastErr?.message || lastErr); continue; }
-    requestIds.push(rid);
-    if (i < N - 1) await sleep(JOB_SPACING_MS);
   }
 
   await atPatch(recordId, { "Request IDs": requestIds.join(", "), "Last Update": nowISO() });
 
-  // Poll
+  // Poll all requests
   requestIds.forEach(rid => pollUntilDone(rid, recordId).catch(e => console.error("[POLL ERROR]", rid, e.message)));
 
   return { recordId, submitted: requestIds.length, request_ids: requestIds };
@@ -344,35 +366,39 @@ app.get("/airtable/run/:recordId", async (req, res) => {
     const out = await startRunFromRecord(req.params.recordId, { batch: Number(req.query.batch || 0) });
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.end(`<html><body style="font-family:system-ui;padding:24px">
-      <h2>Run started</h2>
-      <p>Record: ${out.recordId}</p>
-      <p>Submitted: ${out.submitted}</p>
-      <p>Request IDs: ${out.request_ids.join(", ")}</p>
-      <p>You can close this tab.</p>
+      <h2>✅ Run started</h2>
+      <p><strong>Model:</strong> ${MODEL_NAME}</p>
+      <p><strong>Record:</strong> ${out.recordId}</p>
+      <p><strong>Submitted:</strong> ${out.submitted} jobs</p>
+      <p><strong>Request IDs:</strong> ${out.request_ids.join(", ")}</p>
+      <p>You can close this tab. Results will appear in Airtable.</p>
     </body></html>`);
   } catch (e) {
-    res.status(500).send(String(e.message || e));
+    res.status(500).send(`<html><body style="font-family:system-ui;padding:24px">
+      <h2>❌ Error</h2>
+      <p>${String(e.message || e)}</p>
+    </body></html>`);
   }
 });
 
-/* Existing batch form endpoint */
+/* Batch form endpoint */
 app.post("/generate-batch", async (req, res) => {
   try {
-    const { prompt, subject_url, reference_urls, width, height, batch_count } = req.body;
-    if (!subject_url || !reference_urls || !width || !height || !batch_count) return res.status(400).json({ error: "Missing fields." });
+    const { face_url, target_url, width, height, batch_count } = req.body;
+    if (!face_url || !target_url || !width || !height || !batch_count) {
+      return res.status(400).json({ error: "Missing fields. Need: face_url, target_url, width, height, batch_count" });
+    }
 
-    const refs = splitCSV(reference_urls);
     let { w: W, h: H } = ensureMinPixels(Number(width), Number(height));
 
-    const subjectDataUrl = await urlToDataURL(subject_url);
-    const refDataUrls = [];
-    for (const r of refs) { try { refDataUrls.push(await urlToDataURL(r)); } catch (e) { console.warn("[REF WARN]", r, e.message); } }
+    const faceDataUrl = await urlToDataURL(face_url);
+    const targetDataUrl = await urlToDataURL(target_url);
 
     const runId = uuid();
     const parentId = await atCreate({
-      Prompt: String(prompt || ""),
-      Subject: [{ url: subject_url }],
-      References: refs.map((u, i) => ({ url: u, filename: `ref_${i + 1}` })),
+      Prompt: "Face swap using Seedream v4.5",
+      Subject: [{ url: face_url }],
+      References: [{ url: target_url, filename: "target_1" }],
       Output: [],
       "Output URL": "",
       Model: MODEL_NAME,
@@ -386,15 +412,22 @@ app.post("/generate-batch", async (req, res) => {
       "Last Update": nowISO(),
     });
 
-    const N = Math.max(1, Math.min(100, Number(batch_count)));
+    const N = Math.max(1, Math.min(24, Number(batch_count)));
     const requestIds = [];
+    
     for (let i = 0; i < N; i++) {
       let rid = null, lastErr = null;
       for (let a = 0; a < SUBMIT_MAX_RETRIES && !rid; a++) {
         try {
-          rid = await submitGeneration({ prompt: prompt || "", subjectDataUrl, refDataUrls, width: W, height: H }, parentId);
+          rid = await submitGeneration({ 
+            faceDataUrl, 
+            targetDataUrl, 
+            width: W, 
+            height: H 
+          }, parentId);
         } catch (err) {
-          lastErr = err; await sleep(backoff(a, SUBMIT_BASE_DELAY_MS));
+          lastErr = err; 
+          await sleep(backoff(a, SUBMIT_BASE_DELAY_MS));
         }
       }
       if (!rid) console.error(`[SUBMIT FAIL] job ${i + 1}:`, lastErr?.message || lastErr);
@@ -405,7 +438,14 @@ app.post("/generate-batch", async (req, res) => {
     await atPatch(parentId, { "Request IDs": requestIds.join(", "), "Last Update": nowISO() });
     requestIds.forEach(rid => pollUntilDone(rid, parentId).catch(e => console.error("[POLL ERROR]", rid, e.message)));
 
-    res.json({ ok: true, parent_record_id: parentId, run_id: runId, submitted: requestIds.length, request_ids: requestIds });
+    res.json({ 
+      ok: true, 
+      model: MODEL_NAME,
+      parent_record_id: parentId, 
+      run_id: runId, 
+      submitted: requestIds.length, 
+      request_ids: requestIds 
+    });
   } catch (err) {
     console.error("[/generate-batch ERROR]", err);
     res.status(500).json({ error: err.message || String(err) });
@@ -419,6 +459,8 @@ app.post("/webhooks/wavespeed", async (req, res) => {
     const requestId = b.request_id || b.id || b.requestId || b.request || req.query.request_id;
     const status = (b.status || b.state || "").toLowerCase();
     const outputs = Array.isArray(b.output) ? b.output : Array.isArray(b.outputs) ? b.outputs : typeof b.output === "string" ? [b.output] : [];
+
+    console.log(`[WEBHOOK] Received for ${requestId}: status=${status}, outputs=${outputs.length}`);
 
     const parentRecordId = memoryRequestMap.get(requestId);
     if (!requestId || !parentRecordId) {
@@ -438,7 +480,7 @@ app.post("/webhooks/wavespeed", async (req, res) => {
   }
 });
 
-/* Debug */
+/* Debug endpoint */
 app.get("/debug/prediction/:id", async (req, res) => {
   try {
     const r = await fetch(`${WAVESPEED_BASE}${WAVESPEED_RESULT_PATH}/${encodeURIComponent(req.params.id)}/result`, { headers: { ...authHeader() } });
@@ -449,9 +491,20 @@ app.get("/debug/prediction/:id", async (req, res) => {
   }
 });
 
+/* Health check */
+app.get("/health", (_, res) => {
+  res.json({ 
+    ok: true, 
+    model: MODEL_NAME,
+    endpoint: `${WAVESPEED_BASE}${WAVESPEED_SUBMIT_PATH}`,
+    timestamp: nowISO()
+  });
+});
+
 /* START */
 app.listen(PORT, () => {
   console.log(`[BOOT] Server running on http://localhost:${PORT}`);
+  console.log(`[BOOT] Model: ${MODEL_NAME}`);
   console.log(`[BOOT] Public base URL: ${PUBLIC_BASE_URL}`);
   console.log(`[BOOT] Webhook listening at: ${PUBLIC_BASE_URL}/webhooks/wavespeed`);
 });
