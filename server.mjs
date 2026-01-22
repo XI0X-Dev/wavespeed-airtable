@@ -14,7 +14,7 @@ const {
 
   // WaveSpeed v3
   WAVESPEED_BASE = "https://api.wavespeed.ai",
-  WAVESPEED_SUBMIT_PATH = "/api/v3/bytedance/seedream-v4/edit-sequential",
+  WAVESPEED_SUBMIT_PATH = "/api/v3/bytedance/seedream-v4.5/edit",
   WAVESPEED_RESULT_PATH = "/api/v3/predictions",
   WAVESPEED_AUTH_HEADER = "Authorization",
 } = process.env;
